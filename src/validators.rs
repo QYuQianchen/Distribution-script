@@ -1,9 +1,10 @@
 
-use std::str::FromStr;
+use std::{fs, path::PathBuf, str::FromStr};
 use alloy_primitives::Address;
 use alloy_signer::Signature;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
+use crate::errors::ValidatorError;
 
 /// Signed deposited data for validator registration.
 #[serde_as]
@@ -21,7 +22,6 @@ pub struct SignedDepositData{
     #[serde_as(as = "DisplayFromStr")]
     pub version: u32,
 }
-
 
 impl SignedDepositData {
     /// Create a new `SignedDepositData` instance.
@@ -41,11 +41,23 @@ impl SignedDepositData {
     }
 }
 
+pub fn verify_deposit_data(file: PathBuf) -> Result<Address, ValidatorError> {
+    let content = fs::read_to_string(file.as_path().display().to_string())?;
+
+    let resp: SignedDepositData = serde_json::from_str(&content)?;
+
+    if !resp.verify() {
+        return Err(ValidatorError::SignatureVerificationFailed);
+    }
+
+    Ok(resp.address)
+}
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use log::info;
+    use log::debug;
     use std::{fs, io::Write};
     use tempfile::tempdir;
 
@@ -65,7 +77,7 @@ mod tests {
         }"#;
         let resp: SignedDepositData = serde_json::from_str(s).unwrap();
 
-        info!("Address {} signed {} with {}", resp.address, resp.msg, resp.sig);
+        debug!("Address {} signed {} with {}", resp.address, resp.msg, resp.sig);
         
     }
 
@@ -91,7 +103,7 @@ mod tests {
         let tmp_dir = tempdir().unwrap();
         let file_path = tmp_dir.path().join("signed_deposit_data.json");
 
-        info!("File path: {:?}", file_path);
+        debug!("File path: {:?}", file_path);
         let mut tmp_file =  std::fs::File::create(file_path.clone()).unwrap();
 
         let s = r#"{
@@ -103,18 +115,10 @@ mod tests {
 
         writeln!(tmp_file, "{}", s).unwrap();
 
-        info!("File written");
+        debug!("File written");
 
-        info!(target: "signed_deposite_data_reader", "Reading path {}", &file_path.as_path().display().to_string());
+        let verified_address = verify_deposit_data(file_path.clone()).unwrap();
 
-        let a = fs::read_to_string(file_path.as_path().display().to_string()).unwrap();
-
-        let resp: SignedDepositData = serde_json::from_str(&a).unwrap();
-
-        info!("Address {} signed {} with {}", resp.address, resp.msg, resp.sig);
-
-        info!("File read");
-        drop(tmp_file);
-        tmp_dir.close().unwrap();
+        debug!("Signature verified for address {}", verified_address);
     }
 }
