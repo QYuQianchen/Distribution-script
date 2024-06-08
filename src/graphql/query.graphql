@@ -1,0 +1,26 @@
+query EligibilityCheckQuery($owner: String!, $block: Int!) {
+  safeOwnerPairs(
+    where: {owner_: {id: $owner}}
+    block: {number: $block}
+  ) {
+    owner {
+      id
+    }
+    safe {
+      registeredNodesInNetworkRegistry {
+        node {
+          id
+        }
+      }
+      owners {
+        owner {
+          id
+        }
+      }
+      id
+      balance {
+        wxHoprBalance
+      }
+    }
+  }
+}

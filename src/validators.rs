@@ -10,7 +10,7 @@ use crate::errors::ValidatorError;
 #[serde_as]
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
-pub struct SignedDepositData{
+pub struct SignedDepositData {
     /// Address of the signer
     #[serde_as(as = "DisplayFromStr")]
     pub address: Address,
@@ -58,7 +58,7 @@ pub fn verify_deposit_data(file: PathBuf) -> Result<Address, ValidatorError> {
 mod tests {
     use super::*;
     use log::debug;
-    use std::{fs, io::Write};
+    use std::io::Write;
     use tempfile::tempdir;
 
     fn init() {

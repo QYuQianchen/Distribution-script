@@ -1,8 +1,9 @@
 pub mod validators;
+pub mod subgraph;
 pub mod errors;
 
 use alloy_primitives::Address;
-use log::{debug, info};
+use log::info;
 use validators::verify_deposit_data;
 use std::{fs, path::{Path, PathBuf}};
 use clap::{Parser, ValueHint};
