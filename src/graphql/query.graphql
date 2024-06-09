@@ -1,6 +1,6 @@
-query EligibilityCheckQuery($owner: String!, $block: Int!) {
+query EligibilityCheckQuery($addrs: [ID!], $block: Int!) {
   safeOwnerPairs(
-    where: {owner_: {id: $owner}}
+    where: {owner_: {id_in: $addrs}}
     block: {number: $block}
   ) {
     owner {
