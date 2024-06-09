@@ -3,11 +3,12 @@ use std::{
     env
 };
 use graphql_client::{GraphQLQuery, Response};
-use alloy_primitives::Address;
+use alloy_primitives::{utils::parse_units, Address, U256};
 use log::{debug, info};
 use reqwest;
 use crate::errors::SubgraphError;
 
+// this is a workaround for the custom BigDecimal type in the subgraph schema
 type BigDecimal = String;
 
 #[derive(GraphQLQuery)]
@@ -45,14 +46,6 @@ impl Clone for eligibility_check_query::Variables {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Assets {
-    pub balance: BigDecimal,
-    pub safes: Vec<Address>,
-    pub nodes: Vec<Address>,
-    pub linked_owners: Vec<Address>,
-}
-
 impl SubgraphQuery {
     pub fn new(block: i64, owner: String) -> Self {
         let prod_api_key = env::var("SUBGRAPH_PROD_API_KEY").expect("Missing SUBGRAPH_PROD_API_KEY env var");
@@ -74,6 +67,7 @@ impl SubgraphQuery {
         }
     }
 
+    /// Run queries on the subgraph endpoints. Use development endpoint as a backup
     pub async fn run(&self) -> Result<Response<eligibility_check_query::ResponseData>, Box<dyn std::error::Error>> {
         for url in &self.urls {
             info!("querying enpoint {:?}", &url);
@@ -117,11 +111,65 @@ impl SubgraphQuery {
     }
 }
 
+#[derive(Default, Debug, Clone)]
+pub struct Assets {
+    pub balance: U256,
+    pub safes: Vec<Address>,
+    pub nodes: Vec<Address>,
+    pub linked_owners: Vec<Address>,
+}
+
+impl Assets {
+    pub fn from_response(response: Response<eligibility_check_query::ResponseData>) -> Result<Self, Box<dyn std::error::Error>> {
+        let data = response.data.expect("cannot get data from response");
+        
+        let mut assets = Assets::default();
+
+        if data.safe_owner_pairs.is_empty() {
+            return Ok(assets);
+        }
+
+        for safe_owner_pair in data.safe_owner_pairs.iter() {
+            // push each safe address to the safes vector
+            assets.safes.push(safe_owner_pair.safe.id.parse::<Address>().unwrap());
+
+            // parse wxHOPR balance to U256
+            let balance:U256 = parse_units(&safe_owner_pair.safe.balance.wx_hopr_balance, "ether").expect("cannot parse wxHOPR balance").into();
+            assets.balance = balance;
+
+            // push node addresses to the nodes vector
+            let mut node_addresses = safe_owner_pair.safe.registered_nodes_in_network_registry
+                .iter()
+                .map(
+                    |node| node.node.id.parse::<Address>().unwrap()
+                )
+                .collect();
+            assets.nodes.append(&mut node_addresses);
+
+            // get all the unique linked owners
+            for owner in safe_owner_pair.safe.owners.iter() {
+                let owner_address = owner.owner.id.parse::<Address>().unwrap();
+                if owner_address != safe_owner_pair.owner.id.parse::<Address>().unwrap() && !assets.linked_owners.iter().any(|x| x == &owner_address) {
+                    assets.linked_owners.push(owner_address);
+                }
+            }
+        }
+
+        Ok(assets)
+    }
+    
+}
 
 #[cfg(test)]
 pub mod tests {
+    use std::str::FromStr;
+
     use super::*;
+    use eligibility_check_query::ResponseData;
     use log::debug;
+    // use eligibility_check_query::{EligibilityCheckQuerySafeOwnerPairs, EligibilityCheckQuerySafeOwnerPairsOwner, EligibilityCheckQuerySafeOwnerPairsSafe, EligibilityCheckQuerySafeOwnerPairsSafeBalance, EligibilityCheckQuerySafeOwnerPairsSafeOwners, EligibilityCheckQuerySafeOwnerPairsSafeOwnersOwner, EligibilityCheckQuerySafeOwnerPairsSafeRegisteredNodesInNetworkRegistry, EligibilityCheckQuerySafeOwnerPairsSafeRegisteredNodesInNetworkRegistryNode, ResponseData};
+    // use serde::Serialize;
+    use serde_json::json;
 
     fn init() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -144,5 +192,121 @@ pub mod tests {
 
         env::remove_var("SUBGRAPH_PROD_API_KEY");
         env::remove_var("SUBGRAPH_DEV_ACCOUNT_ID");
+    }
+
+    #[tokio::test]
+    async fn get_asset_from_returned_result() {
+        init();
+
+        let body: Response<ResponseData> = serde_json::from_value(json!({
+            "data": {
+                "safeOwnerPairs": [
+                    {
+                        "owner": {
+                            "id": "0x226d833075c26dbf9aa377de0363e435808953a4",
+                        },
+                        "safe": {
+                            "registeredNodesInNetworkRegistry": [
+                                {
+                                    "node": {
+                                        "id": "0x06e7df53f76d5a0d3114e1ab6332a66b4e36cd86",
+                                    },
+                                },
+                            ],
+                            "owners": [
+                                {
+                                    "owner": {
+                                        "id": "0x226d833075c26dbf9aa377de0363e435808953a4",
+                                    },
+                                },
+                            ],
+                            "id": "0x04d516f717ac1e45af3cd9694c37be10470cfb28",
+                            "balance": {
+                                "wxHoprBalance": "0",
+                            },
+                        },
+                    },
+                    {
+                        "owner": {
+                            "id": "0x226d833075c26dbf9aa377de0363e435808953a4",
+                        },
+                        "safe": {
+                            "registeredNodesInNetworkRegistry": [
+                                {
+                                    "node": {
+                                        "id": "0xf8c9c5dc27e843eb2d2c1e61501e421aeabd6acd",
+                                    },
+                                },
+                            ],
+                            "owners": [
+                                {
+                                    "owner": {
+                                        "id": "0x226d833075c26dbf9aa377de0363e435808953a4",
+                                    },
+                                },
+                            ],
+                            "id": "0x0d9d6d05a37353a98a9beaaf2c852089793f5dd1",
+                            "balance": {
+                                "wxHoprBalance": "0",
+                            },
+                        },
+                    },
+                    {
+                        "owner": {
+                            "id": "0x226d833075c26dbf9aa377de0363e435808953a4",
+                        },
+                        "safe": {
+                            "registeredNodesInNetworkRegistry": [
+                                {
+                                    "node": {
+                                        "id": "0x037bebadd20b11816c0dbf5ee4905addbbac932f",
+                                    },
+                                },
+                                {
+                                    "node": {
+                                        "id": "0x098c33a07281bfbb9010b22ea16e0500789fc6c3",
+                                    },
+                                },
+                                {
+                                    "node": {
+                                        "id": "0xc440419850680e4f9ad8089b011915b24bdc0759",
+                                    },
+                                },
+                            ],
+                            "owners": [
+                                {
+                                    "owner": {
+                                        "id": "0x226d833075c26dbf9aa377de0363e435808953a4",
+                                    },
+                                },
+                                {
+                                    "owner": {
+                                        "id": "0x84aa5bbccfc1a77e99e81d45d4ffa2c1f5f7dea2",
+                                    },
+                                },
+                            ],
+                            "id": "0x989b9a0c195a7b416794070dfbc5dc8c1bcfb6d6",
+                            "balance": {
+                                "wxHoprBalance": "413311.33",
+                            },
+                        },
+                    },
+                ],
+            },
+        })).unwrap();
+    
+        let assets_from_body = Assets::from_response(body).unwrap();
+        debug!("{:?}", assets_from_body);
+
+        assert_eq!(assets_from_body.balance, U256::from_str("413311330000000000000000").unwrap());
+        assert_eq!(assets_from_body.safes.len(), 3);
+        assert_eq!(assets_from_body.nodes.len(), 5);
+        assert_eq!(assets_from_body.linked_owners.len(), 1);
+        // assert_eq!(assets_from_body.balance, Assets { 
+        //     balance: U256::from("413311330000000000000000"), 
+        //     safes: vec!["0x04d516f717ac1e45af3cd9694c37be10470cfb28", "0x0d9d6d05a37353a98a9beaaf2c852089793f5dd1", "0x989b9a0c195a7b416794070dfbc5dc8c1bcfb6d6"], 
+        //     nodes: vec!["0x06e7df53f76d5a0d3114e1ab6332a66b4e36cd86", "0xf8c9c5dc27e843eb2d2c1e61501e421aeabd6acd", "0x037bebadd20b11816c0dbf5ee4905addbbac932f", "0x098c33a07281bfbb9010b22ea16e0500789fc6c3", "0xc440419850680e4f9ad8089b011915b24bdc0759"],
+        //     linked_owners: vec!["0x84aa5bbccfc1a77e99e81d45d4ffa2c1f5f7dea2"] 
+        // });
     }
 }
