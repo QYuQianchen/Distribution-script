@@ -1,5 +1,6 @@
 pub mod validators;
 pub mod subgraph;
+pub mod requirements;
 pub mod errors;
 
 use alloy_primitives::Address;
@@ -19,6 +20,16 @@ pub struct CliArgs {
         value_hint = ValueHint::DirPath,
     )]
     pub deposit_data_dir: String,
+
+    /// Path to store claim history
+    #[clap(
+        short,
+        long,
+        help = "The path to the claim history",
+        value_hint = ValueHint::FilePath,
+        name = "claim_history_path"
+    )]
+    pub claim_history_path: PathBuf,
 }
 
 #[tokio::main]
