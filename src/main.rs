@@ -4,7 +4,9 @@ pub mod requirements;
 pub mod errors;
 
 use alloy_primitives::Address;
-use log::info;
+use log::{debug, info};
+use requirements::{check_owners_eligibility, Claims};
+use subgraph::{AssetList, SubgraphQuery};
 use validators::verify_deposit_data;
 use std::{fs, path::{Path, PathBuf}};
 use clap::{Parser, ValueHint};
@@ -16,7 +18,7 @@ pub struct CliArgs {
     #[clap(
         help = "Directory to where all the deposit data files are stored",
         long,
-        short = 'd',
+        short,
         value_hint = ValueHint::DirPath,
     )]
     pub deposit_data_dir: String,
@@ -31,7 +33,32 @@ pub struct CliArgs {
     )]
     pub claim_history_path: PathBuf,
 
-    
+    /// Minimum amount of HOPR tokens in a Safe
+    #[clap(
+        help = "Hopr amount in ether, e.g. 10000000",
+        long,
+        short = 't',
+        default_value = "10000000"
+    )]
+    hopr_amount: String,
+
+    /// Minimum number of nodes in a Safe
+    #[clap(
+        help = "Minimum number of nodes in a Safe",
+        long,
+        short,
+        default_value = "1"
+    )]
+    min_nodes: u32,
+
+    /// Subgraph query snapshot block number
+    #[clap(
+        help = "Snapshot block number for the subgraph query",
+        long,
+        short,
+        default_value = "34310645"
+    )]
+    block_number: u32,
 }
 
 #[tokio::main]
@@ -61,8 +88,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
         info!("Verifing deposit data file: {:?}", &file);
         validator_addresses.push(verify_deposit_data(file)?);
     }
-    info!("Verified {:?} addresses", &validator_addresses.len());
+    info!("Verified {:?} owner addresses", &validator_addresses.len());
+    
+    // check the requirements
+    let requirements = requirements::Requirements::new(args.hopr_amount.parse()?, args.min_nodes);
 
+    // read the subgraph
+    let subgraph_query = SubgraphQuery::new(args.block_number.into(), &validator_addresses);
+    let response = subgraph_query.run().await?;
+    debug!("{:?}", response);
+    let mut asset_list = AssetList::default();
+    asset_list.from_response(response);
 
+    // read claimed history
+    let mut claim_history = Claims::read_from_csv(&args.claim_history_path)?;
+
+    check_owners_eligibility(
+        &validator_addresses,
+        &requirements,
+        &asset_list,
+        &mut claim_history,
+    );
+
+    // write the claimed history
+    claim_history.write_to_csv(&args.claim_history_path)?;
     Ok(())
 }

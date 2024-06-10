@@ -46,12 +46,12 @@ impl Clone for eligibility_check_query::Variables {
 }
 
 impl SubgraphQuery {
-    pub fn new(block: i64, owner_addresses: Vec<Address>) -> Self {
+    pub fn new(block: i64, owner_addresses: &Vec<Address>) -> Self {
         let prod_api_key = env::var("SUBGRAPH_PROD_API_KEY").expect("Missing SUBGRAPH_PROD_API_KEY env var");
         let dev_account_id = env::var("SUBGRAPH_DEV_ACCOUNT_ID").expect("Missing SUBGRAPH_DEV_ACCOUNT_ID env var");
 
         let urls = vec![
-            format!("https://gateway.thegraph.com/api/{}/subgraphs/id/FEsQcaX9qfh31YL2K7rxRN5a3sr9rjMWkguJnby7StNRo", prod_api_key),
+            format!("https://gateway.thegraph.com/api/{}/subgraphs/id/FEQcaX9qfh31YL2K7rxRN5a3sr9rjMWkguJnby7StNRo", prod_api_key),
             format!("https://api.studio.thegraph.com/query/{}/hopr-nodes-dufour/version/latest", dev_account_id),
         ];
 

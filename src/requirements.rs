@@ -61,13 +61,16 @@ pub struct Claims {
 impl Claims {
     /// Read the claims from a CSV file.
     pub fn read_from_csv(filename: &PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
-        let file = std::fs::File::open(filename)?;
-        let mut reader = Reader::from_reader(file);
-
         let mut claim_history = Self::default();
-        for deserialized_iter in reader.deserialize() {
-            let record: Claim = deserialized_iter?;
-            claim_history.claims.push(record);
+        if let Ok(file) = std::fs::File::open(filename) {
+            let mut reader = Reader::from_reader(file);
+
+            for deserialized_iter in reader.deserialize() {
+                let record: Claim = deserialized_iter?;
+                claim_history.claims.push(record);
+            }
+        } else {
+            info!("File not exist at {:?}", filename);
         }
         Ok(claim_history)
     }
