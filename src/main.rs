@@ -1,15 +1,18 @@
-pub mod validators;
-pub mod subgraph;
-pub mod requirements;
 pub mod errors;
+pub mod requirements;
+pub mod subgraph;
+pub mod validators;
 
 use alloy_primitives::Address;
+use clap::{Parser, ValueHint};
 use log::{debug, info};
 use requirements::{check_owners_eligibility, Claims};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use subgraph::{AssetList, SubgraphQuery};
 use validators::verify_deposit_data;
-use std::{fs, path::{Path, PathBuf}};
-use clap::{Parser, ValueHint};
 
 #[derive(Debug, Clone, Parser)]
 #[command(author, version, about, long_about = None)]
@@ -62,7 +65,7 @@ pub struct CliArgs {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>>{
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
     let args = CliArgs::parse();
@@ -89,7 +92,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
         validator_addresses.push(verify_deposit_data(file)?);
     }
     info!("Verified {:?} owner addresses", &validator_addresses.len());
-    
+
     // check the requirements
     let requirements = requirements::Requirements::new(args.hopr_amount.parse()?, args.min_nodes);
 
@@ -98,14 +101,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
     let response = subgraph_query.run().await?;
     debug!("{:?}", response);
     let mut asset_list = AssetList::default();
-    asset_list.from_response(response);
+    asset_list.from_response(response)?;
 
     // read claimed history
     let mut claim_history = Claims::read_from_csv(&args.claim_history_path)?;
 
     let eligible_owners = check_owners_eligibility(
         &validator_addresses,
-        &requirements,
+        &requirements?,
         &asset_list,
         &mut claim_history,
     );

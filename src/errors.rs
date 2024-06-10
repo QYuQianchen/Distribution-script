@@ -26,9 +26,11 @@ pub enum SubgraphError {
     /// Error after trying requests with both production and development endpoints
     #[error("All the subgraph requests failed")]
     AllRequestsFailed,
+
+    /// Error when deduplicating addresses fails
+    #[error("Deduplicate addresses failed")]
+    DedupAddressesFailed,
 }
-
-
 
 /// Application error type.
 #[derive(Debug, Error)]

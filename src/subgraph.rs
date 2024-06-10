@@ -1,11 +1,13 @@
-use std::{
-    collections::HashMap, env, fmt::{Debug, Formatter},
-};
-use graphql_client::{GraphQLQuery, Response};
-use alloy_primitives::{utils::parse_units, Address, U256};
-use log::{debug, info};
-use reqwest;
 use crate::errors::SubgraphError;
+use alloy_primitives::{utils::parse_units, Address, U256};
+use graphql_client::{GraphQLQuery, Response};
+use log::{debug, info, warn};
+use reqwest;
+use std::{
+    collections::HashMap,
+    env,
+    fmt::{Debug, Formatter},
+};
 
 // this is a workaround for the custom BigDecimal type in the subgraph schema
 type BigDecimal = String;
@@ -38,17 +40,19 @@ impl Debug for eligibility_check_query::Variables {
 impl Clone for eligibility_check_query::Variables {
     fn clone(&self) -> eligibility_check_query::Variables {
         let eligibility_check_query::Variables { addrs, block } = self;
-            eligibility_check_query::Variables {
-                addrs: addrs.clone(),
-                block: *block,
-            }
+        eligibility_check_query::Variables {
+            addrs: addrs.clone(),
+            block: *block,
+        }
     }
 }
 
 impl SubgraphQuery {
-    pub fn new(block: i64, owner_addresses: &Vec<Address>) -> Self {
-        let prod_api_key = env::var("SUBGRAPH_PROD_API_KEY").expect("Missing SUBGRAPH_PROD_API_KEY env var");
-        let dev_account_id = env::var("SUBGRAPH_DEV_ACCOUNT_ID").expect("Missing SUBGRAPH_DEV_ACCOUNT_ID env var");
+    pub fn new(block: i64, owner_addresses: &[Address]) -> Self {
+        let prod_api_key =
+            env::var("SUBGRAPH_PROD_API_KEY").expect("Missing SUBGRAPH_PROD_API_KEY env var");
+        let dev_account_id =
+            env::var("SUBGRAPH_DEV_ACCOUNT_ID").expect("Missing SUBGRAPH_DEV_ACCOUNT_ID env var");
 
         let urls = vec![
             format!("https://gateway.thegraph.com/api/{}/subgraphs/id/FEQcaX9qfh31YL2K7rxRN5a3sr9rjMWkguJnby7StNRo", prod_api_key),
@@ -56,32 +60,35 @@ impl SubgraphQuery {
         ];
 
         let params = eligibility_check_query::Variables {
-            addrs: Some(owner_addresses.iter().map(|addr| addr.to_string().to_lowercase()).collect::<Vec<String>>().to_owned()),
+            addrs: Some(
+                owner_addresses
+                    .iter()
+                    .map(|addr| addr.to_string().to_lowercase())
+                    .collect::<Vec<String>>()
+                    .to_owned(),
+            ),
             block,
         };
 
-        Self {
-            urls,
-            params
-        }
+        Self { urls, params }
     }
 
     /// Run queries on the subgraph endpoints. Use development endpoint as a backup
-    pub async fn run(&self) -> Result<Response<eligibility_check_query::ResponseData>, Box<dyn std::error::Error>> {
+    pub async fn run(
+        &self,
+    ) -> Result<Response<eligibility_check_query::ResponseData>, Box<dyn std::error::Error>> {
         for url in &self.urls {
             info!("querying enpoint {:?}", &url);
 
             let request_body = EligibilityCheckQuery::build_query(self.params.clone());
             let client = reqwest::Client::new();
-            let res = client.post(url)
-                .json(&request_body)
-                .send()
-                .await;
+            let res = client.post(url).json(&request_body).send().await;
 
             // catch errors and continue to the next subgraph endpoint if needed
             match res {
                 Ok(res) => {
-                    let response_body: Result<Response<eligibility_check_query::ResponseData>, _> = res.json().await;
+                    let response_body: Result<Response<eligibility_check_query::ResponseData>, _> =
+                        res.json().await;
                     match response_body {
                         Ok(response_body) => {
                             info!("{:#?}", response_body);
@@ -96,13 +103,13 @@ impl SubgraphQuery {
                         Err(_) => {
                             debug!("Failed to parse response body");
                             continue;
-                        },
+                        }
                     }
                 }
                 Err(_) => {
                     debug!("Failed to send request");
                     continue;
-                },
+                }
             }
         }
 
@@ -120,7 +127,9 @@ pub struct Assets {
 }
 
 impl Assets {
-    pub fn from_response(pairs: Vec<&eligibility_check_query::EligibilityCheckQuerySafeOwnerPairs>) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_response(
+        pairs: Vec<&eligibility_check_query::EligibilityCheckQuerySafeOwnerPairs>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut assets = Assets::default();
 
         if pairs.is_empty() {
@@ -129,20 +138,29 @@ impl Assets {
 
         for safe_owner_pair in pairs.iter() {
             // push each safe address to the safes vector
-            assets.safes.push(safe_owner_pair.safe.id.parse::<Address>().unwrap());
+            assets
+                .safes
+                .push(safe_owner_pair.safe.id.parse::<Address>()?);
 
             // parse wxHOPR balance to U256
-            let balance:U256 = parse_units(&safe_owner_pair.safe.balance.wx_hopr_balance, "ether").expect("cannot parse wxHOPR balance").into();
+            let balance: U256 = parse_units(&safe_owner_pair.safe.balance.wx_hopr_balance, "ether")
+                .expect("cannot parse wxHOPR balance")
+                .into();
             assets.balance.push(balance);
 
             // push node addresses to the nodes vector
-            let node_counts = safe_owner_pair.safe.registered_nodes_in_network_registry.len() as u32;
+            let node_counts = safe_owner_pair
+                .safe
+                .registered_nodes_in_network_registry
+                .len() as u32;
             assets.nodes_count.push(node_counts);
 
             // get all the unique linked owners
             for owner in safe_owner_pair.safe.owners.iter() {
-                let owner_address = owner.owner.id.parse::<Address>().unwrap();
-                if owner_address != safe_owner_pair.owner.id.parse::<Address>().unwrap() && !assets.linked_owners.iter().any(|x| x == &owner_address) {
+                let owner_address = owner.owner.id.parse::<Address>()?;
+                if owner_address != safe_owner_pair.owner.id.parse::<Address>()?
+                    && !assets.linked_owners.iter().any(|x| x == &owner_address)
+                {
                     assets.linked_owners.push(owner_address);
                 }
             }
@@ -159,35 +177,58 @@ pub struct AssetList {
 }
 
 impl AssetList {
-    pub fn from_response(&mut self, response: Response<eligibility_check_query::ResponseData>) -> &mut Self {
+    pub fn from_response(
+        &mut self,
+        response: Response<eligibility_check_query::ResponseData>,
+    ) -> Result<&mut Self, Box<dyn std::error::Error>> {
         let data = response.data.expect("cannot get data from response");
-        
+
         if data.safe_owner_pairs.is_empty() {
-            return self;
+            return Ok(self);
         }
 
         // get all the owners
-        let owners = data.safe_owner_pairs.iter().fold(vec![] as Vec<Address>, |mut acc, x| {
-            if !acc.iter().any(|y| y == &x.owner.id.parse::<Address>().unwrap()){
-                acc.push(x.owner.id.parse::<Address>().unwrap());
-            }
-            acc
-        });
+        let owners = data
+            .safe_owner_pairs
+            .iter()
+            .fold(vec![] as Vec<Address>, |mut acc, x| {
+                let address = x.owner.id.parse::<Address>();
+                match address {
+                    Ok(address) => {
+                        if !acc.iter().any(|y| y == &address) {
+                            acc.push(address);
+                        }
+                    }
+                    Err(e) => {
+                        warn!("cannot parse address {:?}", e);
+                    }
+                }
+                acc
+            });
         info!("unique owners {:?}", owners);
 
         // for each owner, get the assets
         for owner in owners {
-            let owner_response = data.safe_owner_pairs.iter().filter(
-                |&safe_owner_pair| safe_owner_pair.owner.id.parse::<Address>().unwrap().eq(&owner)
-            ).collect::<Vec<&eligibility_check_query::EligibilityCheckQuerySafeOwnerPairs>>();
+            let owner_response = data
+                .safe_owner_pairs
+                .iter()
+                .filter(|&safe_owner_pair| {
+                    let address = safe_owner_pair.owner.id.parse::<Address>();
+                    match address {
+                        Ok(address) => address.eq(&owner),
+                        Err(_) => false,
+                    }
+                })
+                .collect::<Vec<&eligibility_check_query::EligibilityCheckQuerySafeOwnerPairs>>();
 
             debug!("owner {:?} owner_response {:?}", &owner, &owner_response);
-            
-            let assets = Assets::from_response(owner_response).expect("cannot get assets from response");
+
+            let assets =
+                Assets::from_response(owner_response).expect("cannot get assets from response");
             info!("owner {:?} has assets {:?}", &owner, &assets);
             self.asset_list.insert(owner, assets);
         }
-        self
+        Ok(self)
     }
 }
 
@@ -212,9 +253,12 @@ pub mod tests {
         env::set_var("SUBGRAPH_PROD_API_KEY", "abc123");
         env::set_var("SUBGRAPH_DEV_ACCOUNT_ID", "123abc");
 
-        let subgraph_query = SubgraphQuery::new(34310645, vec![address!("226d833075c26dbf9aa377de0363e435808953a4")]);
+        let subgraph_query = SubgraphQuery::new(
+            34310645,
+            &vec![address!("226d833075c26dbf9aa377de0363e435808953a4")],
+        );
 
-        // let data = subgraph_query.run().await.unwrap().data.expect("cannot query data");
+        // let data = subgraph_query.run().await?.data.expect("cannot query data");
         // debug!("{:?}", data);
         if subgraph_query.run().await.is_ok() {
             panic!("should not return data from subgraph");
@@ -323,13 +367,18 @@ pub mod tests {
                     },
                 ],
             },
-        })).unwrap();
-    
-        let assets_from_body = Assets::from_response(body.data.unwrap().safe_owner_pairs.iter().collect()).unwrap();
+        }))
+        .unwrap();
+
+        let assets_from_body =
+            Assets::from_response(body.data.unwrap().safe_owner_pairs.iter().collect()).unwrap();
         debug!("{:?}", assets_from_body);
 
         assert_eq!(assets_from_body.balance.len(), 3);
-        assert_eq!(assets_from_body.balance[2], U256::from_str("413311330000000000000000").unwrap());
+        assert_eq!(
+            assets_from_body.balance[2],
+            U256::from_str("413311330000000000000000").unwrap()
+        );
         assert_eq!(assets_from_body.safes.len(), 3);
         assert_eq!(assets_from_body.nodes_count.len(), 3);
         assert_eq!(assets_from_body.nodes_count[0], 1);
@@ -800,13 +849,23 @@ pub mod tests {
                 }
               ]
             }
-        })).unwrap();
-    
+        }))
+        .unwrap();
+
         let mut asset_list = AssetList::default();
-        asset_list.from_response(body);
+        asset_list.from_response(body).unwrap();
         debug!("{:?}", asset_list);
 
         assert_eq!(asset_list.asset_list.len(), 2);
-        assert_eq!(asset_list.asset_list.get(&address!("226d833075c26dbf9aa377de0363e435808953a4")).unwrap().balance.last().unwrap(), &U256::from_str("30311930000000000000000").unwrap());
+        assert_eq!(
+            asset_list
+                .asset_list
+                .get(&address!("226d833075c26dbf9aa377de0363e435808953a4"))
+                .unwrap()
+                .balance
+                .last()
+                .unwrap(),
+            &U256::from_str("30311930000000000000000").unwrap()
+        );
     }
 }
