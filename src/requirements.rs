@@ -7,7 +7,7 @@ use std::{fmt::Debug, path::PathBuf};
 
 use crate::subgraph::{AssetList, Assets};
 
-/// Minimum requirements for an owner to be considered as eligible
+/// Minimum requirements for an owner to be considered as eligible.
 pub struct Requirements {
     min_safe_balance: U256,
     min_running_node: u32,
@@ -15,6 +15,15 @@ pub struct Requirements {
 
 impl Requirements {
     /// Create a new `Requirements` instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `min_safe_balance_in_eth` - The minimum safe balance in Ether as a string.
+    /// * `min_running_node` - The minimum number of running nodes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `min_safe_balance_in_eth` cannot be parsed or converted to U256.
     pub fn new(
         min_safe_balance_in_eth: String,
         min_running_node: u32,
@@ -26,6 +35,15 @@ impl Requirements {
     }
 
     /// Check if the owner meets the minimum requirements.
+    ///
+    /// # Arguments
+    ///
+    /// * `safe_balance` - The safe balance of the owner.
+    /// * `running_nodes` - The number of running nodes of the owner.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if the owner meets the minimum requirements, `false` otherwise.
     pub fn check_requirements(&self, safe_balance: &U256, running_nodes: &u32) -> bool {
         let check_balance = safe_balance >= &self.min_safe_balance;
         let check_nodes = running_nodes >= &self.min_running_node;
@@ -37,6 +55,14 @@ impl Requirements {
     }
 
     /// Check if at least one asset fulfills the requirements.
+    ///
+    /// # Arguments
+    ///
+    /// * `assets` - The assets of the owner.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if at least one asset fulfills the requirements, `false` otherwise.
     pub fn check_at_least_one_asset_fulfills_requirments(&self, assets: &Assets) -> bool {
         for (index, safe_balance) in assets.balance.iter().enumerate() {
             if self.check_requirements(safe_balance, &assets.nodes_count[index]) {
@@ -65,6 +91,14 @@ pub struct Claims {
 
 impl Claims {
     /// Read the claims from a CSV file.
+    ///
+    /// # Arguments
+    ///
+    /// * `filename` - The path to the CSV file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be opened or the CSV cannot be deserialized.
     pub fn read_from_csv(filename: &PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
         let mut claim_history = Self::default();
         if let Ok(file) = std::fs::File::open(filename) {
@@ -81,6 +115,14 @@ impl Claims {
     }
 
     /// Write the claims to a CSV file.
+    ///
+    /// # Arguments
+    ///
+    /// * `filename` - The path to the CSV file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be created or the claims cannot be serialized.
     pub fn write_to_csv(&self, filename: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         let file = std::fs::File::create(filename)?;
         let mut writer = csv::Writer::from_writer(file);
@@ -92,16 +134,32 @@ impl Claims {
     }
 
     /// Add a claim to the claim history.
+    ///
+    /// # Arguments
+    ///
+    /// * `claim` - The claim to be added.
     pub fn add_claim(&mut self, claim: Claim) {
         self.claims.push(claim);
     }
 
     /// Add multiple claims to the claim history.
+    ///
+    /// # Arguments
+    ///
+    /// * `claims` - The claims to be added.
     pub fn add_claims(&mut self, claims: Vec<Claim>) {
         self.claims.extend(claims);
     }
 
     /// Check if some safe addresses are already claimed.
+    ///
+    /// # Arguments
+    ///
+    /// * `safes` - The safe addresses to be checked.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if at least one safe address is already claimed, `false` otherwise.
     pub fn check_claimed(&self, safes: &[Address]) -> bool {
         safes
             .iter()
@@ -109,7 +167,18 @@ impl Claims {
     }
 }
 
-/// Check the eligibility of the owners for claim
+/// Check the eligibility of the owners for claim.
+///
+/// # Arguments
+///
+/// * `owners` - The list of owners to be checked.
+/// * `requirements` - The minimum requirements for eligibility.
+/// * `asset_list` - The list of assets for each owner.
+/// * `claim_history` - The claim history.
+///
+/// # Returns
+///
+/// Returns a list of eligible owners.
 pub fn check_owners_eligibility(
     owners: &Vec<Address>,
     requirements: &Requirements,

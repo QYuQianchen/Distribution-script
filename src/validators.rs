@@ -32,6 +32,7 @@ impl SignedDepositData {
     }
 }
 
+/// Verify the signature of the deposit data.
 pub fn verify_deposit_data(file: PathBuf) -> Result<Address, Box<dyn std::error::Error>> {
     let content = fs::read_to_string(file.as_path().display().to_string())?;
 

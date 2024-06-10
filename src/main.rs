@@ -1,8 +1,3 @@
-pub mod errors;
-pub mod requirements;
-pub mod subgraph;
-pub mod validators;
-
 use alloy_primitives::Address;
 use clap::{Parser, ValueHint};
 use log::{debug, info};
@@ -14,10 +9,16 @@ use std::{
 use subgraph::{AssetList, SubgraphQuery};
 use validators::verify_deposit_data;
 
+pub mod errors;
+pub mod requirements;
+pub mod subgraph;
+pub mod validators;
+
+/// Command line arguments
 #[derive(Debug, Clone, Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct CliArgs {
-    /// Directory to all the identity files
+    /// Directory to all the signed deposit data files
     #[clap(
         help = "Directory to where all the deposit data files are stored",
         long,
@@ -70,7 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let args = CliArgs::parse();
 
-    // read files from the directory
+    // Read files from the directory
     let directory = fs::read_dir(Path::new(&args.deposit_data_dir))?;
     let files = directory
         .filter_map(|file| {
@@ -85,27 +86,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .collect::<Vec<PathBuf>>();
     info!("To Read files: {:?}", files);
 
-    // verify the signature of the deposit data
+    // Verify the signature of the deposit data
     let mut validator_addresses: Vec<Address> = vec![];
     for file in files {
-        info!("Verifing deposit data file: {:?}", &file);
+        info!("Verifying deposit data file: {:?}", &file);
         validator_addresses.push(verify_deposit_data(file)?);
     }
     info!("Verified {:?} owner addresses", &validator_addresses.len());
 
-    // check the requirements
+    // Check the requirements
     let requirements = requirements::Requirements::new(args.hopr_amount.parse()?, args.min_nodes);
 
-    // read the subgraph
+    // Read the subgraph
     let subgraph_query = SubgraphQuery::new(args.block_number.into(), &validator_addresses);
     let response = subgraph_query.run().await?;
     debug!("{:?}", response);
     let mut asset_list = AssetList::default();
     asset_list.from_response(response)?;
 
-    // read claimed history
+    // Read claimed history
     let mut claim_history = Claims::read_from_csv(&args.claim_history_path)?;
 
+    // Check owners eligibility
     let eligible_owners = check_owners_eligibility(
         &validator_addresses,
         &requirements?,
@@ -114,7 +116,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     println!("Eligible owners: {:?}", eligible_owners);
-    // write the claimed history
+
+    // Write the claimed history
     claim_history.write_to_csv(&args.claim_history_path)?;
+
     Ok(())
 }
