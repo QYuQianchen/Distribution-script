@@ -1,6 +1,6 @@
 # Distribution Script
 
-This command-line application, written in Rust, verifies signed Gnosis validator data and checks if the signer is eligible for the [500 GNO distribution](https://twitter.com/GnosisDAO/status/1783874344013463583) by GnosisDAO as a result of [GIP-98](https://forum.gnosis.io/t/gip-98-should-gnosisdao-invest-in-hopr-to-kickstart-development-of-gnosisvpn/8348).
+This command-line application, written in Rust, verifies signed Gnosis validator data and checks if the signer an active HOPR node runner.
 
 This script uses `alloy-rs` for Ethereum primitives and `graphql_client` to query subgraphs. When querying subgraphs, it first attempts to query the production subgraph endpoint but falls back to the development endpoint in the Subgraph Studio.
 
