@@ -155,7 +155,6 @@ impl Assets {
 
         Ok(assets)
     }
-    
 }
 
 /// hashmap of address to assets

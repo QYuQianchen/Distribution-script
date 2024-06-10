@@ -50,5 +50,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
     }
     info!("Verified {:?} addresses", &validator_addresses.len());
 
+
     Ok(())
 }
