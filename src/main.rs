@@ -30,6 +30,8 @@ pub struct CliArgs {
         name = "claim_history_path"
     )]
     pub claim_history_path: PathBuf,
+
+    
 }
 
 #[tokio::main]

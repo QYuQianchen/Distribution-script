@@ -115,7 +115,7 @@ impl SubgraphQuery {
 pub struct Assets {
     pub balance: Vec<U256>,
     pub safes: Vec<Address>,
-    pub nodes: Vec<Address>,
+    pub nodes_count: Vec<u32>,
     pub linked_owners: Vec<Address>,
 }
 
@@ -136,13 +136,8 @@ impl Assets {
             assets.balance.push(balance);
 
             // push node addresses to the nodes vector
-            let mut node_addresses = safe_owner_pair.safe.registered_nodes_in_network_registry
-                .iter()
-                .map(
-                    |node| node.node.id.parse::<Address>().unwrap()
-                )
-                .collect();
-            assets.nodes.append(&mut node_addresses);
+            let node_counts = safe_owner_pair.safe.registered_nodes_in_network_registry.len() as u32;
+            assets.nodes_count.push(node_counts);
 
             // get all the unique linked owners
             for owner in safe_owner_pair.safe.owners.iter() {
@@ -336,7 +331,10 @@ pub mod tests {
         assert_eq!(assets_from_body.balance.len(), 3);
         assert_eq!(assets_from_body.balance[2], U256::from_str("413311330000000000000000").unwrap());
         assert_eq!(assets_from_body.safes.len(), 3);
-        assert_eq!(assets_from_body.nodes.len(), 5);
+        assert_eq!(assets_from_body.nodes_count.len(), 3);
+        assert_eq!(assets_from_body.nodes_count[0], 1);
+        assert_eq!(assets_from_body.nodes_count[1], 1);
+        assert_eq!(assets_from_body.nodes_count[2], 3);
         assert_eq!(assets_from_body.linked_owners.len(), 1);
     }
 
