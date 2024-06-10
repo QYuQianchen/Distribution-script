@@ -103,13 +103,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
     // read claimed history
     let mut claim_history = Claims::read_from_csv(&args.claim_history_path)?;
 
-    check_owners_eligibility(
+    let eligible_owners = check_owners_eligibility(
         &validator_addresses,
         &requirements,
         &asset_list,
         &mut claim_history,
     );
 
+    println!("Eligible owners: {:?}", eligible_owners);
     // write the claimed history
     claim_history.write_to_csv(&args.claim_history_path)?;
     Ok(())
