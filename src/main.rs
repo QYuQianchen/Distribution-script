@@ -99,28 +99,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut read_deposit_data: HashMap<Address, DepositData> = Default::default();
     for file in files {
         info!("Reading deposit data file: {:?}", &file);
-        // match SignedDepositData::read_from_file(file.clone()) {
-        //     Ok(signed_deposit_data) => {
-        //         match signed_deposit_data.validate_and_verify_data() {
-        //             Ok(raw_deposit_data) => {
-        //                 info!("Signature verified for {:?}", &file);
-        //                 validator_addresses.push(signed_deposit_data.address);
-        //                 // only store the string data, if all the signatures and deposit_data are valid
-        //                 read_deposit_data.insert(signed_deposit_data.address, raw_deposit_data.into());
-        //             },
-        //             Err(e) => {
-        //                 error!("Error validating file: {:?}", e);
-        //                 debug!("Skipping file: {:?}", &file);
-        //                 continue;
-        //             }
-        //         }
-        //     },
-        //     Err(e) => {
-        //         error!("Error reading file: {:?}", e);
-        //         debug!("Skipping file: {:?}", &file);
-        //         continue;
-        //     }
-        // }
         let result = SignedDepositData::read_from_file(file.clone())
             .and_then(|signed_deposit_data| {
                 signed_deposit_data.validate_and_verify_data().map(|deposit_data| {
