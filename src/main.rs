@@ -3,7 +3,9 @@ use clap::{Parser, ValueHint};
 use log::{debug, error, info};
 use requirements::{check_owners_eligibility, Claims};
 use std::{
-    collections::HashMap, fs, path::{Path, PathBuf}
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
 };
 use subgraph::{AssetList, SubgraphQuery};
 use validators::{DepositData, SignedDepositData};
@@ -99,14 +101,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut read_deposit_data: HashMap<Address, DepositData> = Default::default();
     for file in files {
         info!("Reading deposit data file: {:?}", &file);
-        let result = SignedDepositData::read_from_file(file.clone())
-            .and_then(|signed_deposit_data| {
-                signed_deposit_data.validate_and_verify_data().map(|deposit_data| {
-                    info!("Signature verified for {:?}", &file);
-                    validator_addresses.push(signed_deposit_data.address);
-                    // only store the string data, if all the signatures and deposit_data are valid
-                    read_deposit_data.insert(signed_deposit_data.address, deposit_data);
-                })
+        let result =
+            SignedDepositData::read_from_file(file.clone()).and_then(|signed_deposit_data| {
+                signed_deposit_data
+                    .validate_and_verify_data()
+                    .map(|deposit_data| {
+                        info!("Signature verified for {:?}", &file);
+                        validator_addresses.push(signed_deposit_data.address);
+                        // only store the string data, if all the signatures and deposit_data are valid
+                        read_deposit_data.insert(signed_deposit_data.address, deposit_data);
+                    })
             });
 
         if let Err(e) = result {
@@ -156,8 +160,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     debug!("Write the eligible deposit data to one single json file");
     // Write the eligible deposit_data array to one single json file
-    let eligible_deposit_data_file = Path::new(&args.output_deposit_data_dir).join("eligible_deposit_data.json");
-    fs::write(eligible_deposit_data_file, serde_json::to_string(&eligible_deposit_data)?)?;
-    
+    let eligible_deposit_data_file =
+        Path::new(&args.output_deposit_data_dir).join("eligible_deposit_data.json");
+    fs::write(
+        eligible_deposit_data_file,
+        serde_json::to_string(&eligible_deposit_data)?,
+    )?;
+
     Ok(())
 }

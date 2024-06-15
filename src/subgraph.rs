@@ -49,10 +49,10 @@ impl Clone for eligibility_check_query::Variables {
 
 impl SubgraphQuery {
     pub fn new(block: i64, owner_addresses: &[Address]) -> Self {
-        let prod_eth_api_key =
-            env::var("SUBGRAPH_ETHEREUM_PROD_API_KEY").expect("Missing SUBGRAPH_PROD_API_KEY env var");
-        let prod_arbi_api_key =
-            env::var("SUBGRAPH_ARBITRUM_PROD_API_KEY").expect("Missing SUBGRAPH_PROD_API_KEY env var");
+        let prod_eth_api_key = env::var("SUBGRAPH_ETHEREUM_PROD_API_KEY")
+            .expect("Missing SUBGRAPH_PROD_API_KEY env var");
+        let prod_arbi_api_key = env::var("SUBGRAPH_ARBITRUM_PROD_API_KEY")
+            .expect("Missing SUBGRAPH_PROD_API_KEY env var");
         let dev_account_id =
             env::var("SUBGRAPH_DEV_ACCOUNT_ID").expect("Missing SUBGRAPH_DEV_ACCOUNT_ID env var");
 

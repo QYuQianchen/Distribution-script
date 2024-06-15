@@ -50,10 +50,10 @@ Options:
 ## Example
 There are two identical signed deposit datas under the `./test/input` folder. Check if they are eligible if the minimum requirement is to have at least 20 HOPR tokens in a Safe and 1 running HOPR node:
 ```shell
-$ cargo run -- --input-signed-data-dir ./test/input -o ./test --hopr-amount 20 --min-nodes 1 --claim-history-path ./test/claim_history.csv > result.log
+$ cargo run -- --input-signed-data-dir ./test/input -o ./test --hopr-amount 20 --min-nodes 1 --claim-history-path ./test/claim_history.csv > ./test/result.log
 ```
 The command above should return an empty array as a result.
 
 ```shell
-$ cargo run -- --input-signed-data-dir ./test/input -o ./test --hopr-amount 0 --min-nodes 0 --claim-history-path ./test/claim_history.csv > result.log
+$ cargo run -- --input-signed-data-dir ./test/input -o ./test --hopr-amount 0 --min-nodes 0 --claim-history-path ./test/claim_history.csv > ./test/result.log
 ```

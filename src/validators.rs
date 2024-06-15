@@ -1,15 +1,18 @@
 use alloy_primitives::{Address, FixedBytes, B256};
 use alloy_signer::Signature;
-use blst::{min_pk::{PublicKey, Signature as BLSSignature}, BLST_ERROR};
+use blst::{
+    min_pk::{PublicKey, Signature as BLSSignature},
+    BLST_ERROR,
+};
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-use validator::{Validate, ValidationError};
-use std::{fs,  path::PathBuf, str::FromStr};
-use ssz::{Encode, Decode};
-use ssz_derive::{Encode, Decode};
+use ssz::{Decode, Encode};
+use ssz_derive::{Decode, Encode};
+use std::{fs, path::PathBuf, str::FromStr};
 use tree_hash::{merkle_root, Hash256, PackedEncoding, TreeHash, TreeHashType, BYTES_PER_CHUNK};
 use tree_hash_derive::TreeHash;
+use validator::{Validate, ValidationError};
 
 use crate::errors::ValidatorError;
 
@@ -17,9 +20,7 @@ fn validate_network_name(v: &String) -> Result<(), ValidationError> {
     if *v == "gnosis" {
         Ok(())
     } else {
-        Err(ValidationError::new(
-            "Not supported network",
-        ))
+        Err(ValidationError::new("Not supported network"))
     }
 }
 
@@ -87,7 +88,6 @@ impl Decode for CoreDepositDataSignature {
     fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
         Ok(Self(FixedBytes::from_ssz_bytes(bytes)?))
     }
-    
 }
 
 impl TreeHash for CoreDepositDataSignature {
@@ -120,18 +120,18 @@ struct CoreDepositData {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Validate)]
 pub struct DepositData {
-    #[validate(range(min=32000000000u64, max=32000000000u64))]
-    amount: u64, 
-    deposit_cli_version: String, 
-    deposit_data_root: FixedBytes<32>, 
-    deposit_message_root: FixedBytes<32>, 
+    #[validate(range(min = 32000000000u64, max = 32000000000u64))]
+    amount: u64,
+    deposit_cli_version: String,
+    deposit_data_root: FixedBytes<32>,
+    deposit_message_root: FixedBytes<32>,
     fork_version: FixedBytes<4>,
     #[validate(custom(function = "validate_network_name"))]
-    network_name: String, 
-    pubkey: FixedBytes<48>, 
-    signature: FixedBytes<96>, 
+    network_name: String,
+    pubkey: FixedBytes<48>,
+    signature: FixedBytes<96>,
     #[validate(custom(function = "validate_withdrawal_credentials"))]
-    withdrawal_credentials: B256
+    withdrawal_credentials: B256,
 }
 
 impl DepositData {
@@ -143,11 +143,12 @@ impl DepositData {
             current_version: self.fork_version,
             genesis_validators_root: FixedBytes::<32>::default(),
         };
-        let trimmed_fork_data_root: FixedBytes<28> = fork_data.tree_hash_root().as_bytes()[..28].try_into()?;
+        let trimmed_fork_data_root: FixedBytes<28> =
+            fork_data.tree_hash_root().as_bytes()[..28].try_into()?;
         debug!("Trimmed fork data root: {:?}", trimmed_fork_data_root);
         let deposit_domain: FixedBytes<32> = DOMAIN_DEPOSIT.concat_const(trimmed_fork_data_root);
         debug!("Deposit domain: {:?}", deposit_domain);
-        
+
         // compute signing root
         let deposit_message = DepositMessage {
             pubkey: self.pubkey,
@@ -164,13 +165,28 @@ impl DepositData {
         let signing_root = signing_data.tree_hash_root();
         debug!("Signing root: {:?}", signing_root);
 
-        // verify the signature as in 
+        // verify the signature as in
         // https://github.com/ethereum/py_ecc/blob/0569cb33aae15636d5afe7babed1930a8db6ab84/py_ecc/bls/ciphersuites.py#L298
-        let public_key = PublicKey::from_bytes(&self.pubkey.0).map_err(|e| ValidatorError::BLSVerificationError(format!("Error converting public key: {:?}", e)))?;
-        let signature = BLSSignature::from_bytes(&self.signature.0).map_err(|e| ValidatorError::BLSVerificationError(format!("Error converting signature: {:?}", e)))?;
-        match signature.aggregate_verify(true, &[signing_root.as_bytes()], DOMAIN_SEPARATION_TAG, &[&public_key], true) {
+        let public_key = PublicKey::from_bytes(&self.pubkey.0).map_err(|e| {
+            ValidatorError::BLSVerificationError(format!("Error converting public key: {:?}", e))
+        })?;
+        let signature = BLSSignature::from_bytes(&self.signature.0).map_err(|e| {
+            ValidatorError::BLSVerificationError(format!("Error converting signature: {:?}", e))
+        })?;
+        match signature.aggregate_verify(
+            true,
+            &[signing_root.as_bytes()],
+            DOMAIN_SEPARATION_TAG,
+            &[&public_key],
+            true,
+        ) {
             BLST_ERROR::BLST_SUCCESS => debug!("Signature verified"),
-            e => return Err(Box::new(ValidatorError::BLSVerificationError(format!("Error verifying signature: {:?}", e))))
+            e => {
+                return Err(Box::new(ValidatorError::BLSVerificationError(format!(
+                    "Error verifying signature: {:?}",
+                    e
+                ))))
+            }
         }
 
         // verify deposit root
@@ -183,7 +199,9 @@ impl DepositData {
         let deposit_data_root = core_deposit_data.tree_hash_root();
         debug!("Deposit data root: {:?}", deposit_data_root);
         if deposit_data_root.0 != self.deposit_data_root.0 {
-            return Err(Box::new(ValidatorError::BLSVerificationError("Deposit data root does not match".to_string())));
+            return Err(Box::new(ValidatorError::BLSVerificationError(
+                "Deposit data root does not match".to_string(),
+            )));
         }
 
         info!("Deposit data verified: {:?}", &self);
@@ -220,10 +238,12 @@ impl SignedDepositData {
         let recovered_address = signature.recover_address_from_msg(self.msg.as_bytes())?;
 
         if recovered_address != self.address {
-            return Err(Box::new(ValidatorError::ECDSAVerficationError("Recovered address does not match the signed address".to_string())));
+            return Err(Box::new(ValidatorError::ECDSAVerficationError(
+                "Recovered address does not match the signed address".to_string(),
+            )));
         }
 
-        // Secondly, verify the inner BLS signature of the deposit data, as implemented in 
+        // Secondly, verify the inner BLS signature of the deposit data, as implemented in
         // https://github.com/gnosischain/validator-data-generator/sblob/f90d73ac00c67a816f93ffb28954907f19dc4a07/staking_deposit/utils/validation.py#L43
         let deposit_data_vec: Vec<DepositData> = serde_json::from_str(&self.msg)?;
         info!("Deposit data contains {:?} entries", deposit_data_vec.len());
@@ -243,18 +263,22 @@ impl SignedDepositData {
     }
 
     /// Validate and verify the deposit data. Firstly verify the ECDSA and BLS signatures, then validate the deposit data.
-    /// The deposit data must exactly have one element. 
+    /// The deposit data must exactly have one element.
     /// Return the deposit data string if the validation is successful.
     pub fn validate_and_verify_data(&self) -> Result<DepositData, Box<dyn std::error::Error>> {
         let deposit_data_vec: Vec<DepositData> = self.verify()?;
 
         // deposit data vector must not be empty
         if deposit_data_vec.is_empty() {
-            return Err(Box::new(ValidatorError::ValidationError("No deposit data found".to_string())));
+            return Err(Box::new(ValidatorError::ValidationError(
+                "No deposit data found".to_string(),
+            )));
         }
         // deposit data vector must not have more than one element
         if deposit_data_vec.len() > 1 {
-            return Err(Box::new(ValidatorError::ValidationError("Multiple deposit data found".to_string())));
+            return Err(Box::new(ValidatorError::ValidationError(
+                "Multiple deposit data found".to_string(),
+            )));
         }
         Ok(deposit_data_vec[0].clone())
     }
@@ -362,8 +386,11 @@ mod tests {
         match resp.verify() {
             Err(e) => {
                 debug!("Error: {:?}", e);
-                assert_eq!(e.to_string(), "BLS verification failed: 'Error verifying signature: BLST_VERIFY_FAIL'");
-            },
+                assert_eq!(
+                    e.to_string(),
+                    "BLS verification failed: 'Error verifying signature: BLST_VERIFY_FAIL'"
+                );
+            }
             Ok(deposit_data) => {
                 debug!("Deposit data: {:?}", deposit_data);
                 panic!("The deposit data should not be verified")
@@ -385,8 +412,11 @@ mod tests {
         match resp.verify() {
             Err(e) => {
                 debug!("Error: {:?}", e);
-                assert_eq!(e.to_string(), "BLS verification failed: 'Deposit data root does not match'");
-            },
+                assert_eq!(
+                    e.to_string(),
+                    "BLS verification failed: 'Deposit data root does not match'"
+                );
+            }
             Ok(deposit_data) => {
                 debug!("Deposit data: {:?}", deposit_data);
                 panic!("The deposit data should not be verified")
@@ -411,7 +441,7 @@ mod tests {
             Err(e) => {
                 debug!("Error: {:?}", e);
                 assert_eq!(e.to_string(), "ECDSA verification failed: 'Recovered address does not match the signed address'");
-            },
+            }
             Ok(deposit_data) => {
                 debug!("Deposit data: {:?}", deposit_data);
                 panic!("The deposit data should not be verified")
@@ -431,7 +461,7 @@ mod tests {
         let resp: SignedDepositData = serde_json::from_str(s).unwrap();
         let deposit_data_vec = resp.validate_and_verify_data().unwrap();
 
-        assert_eq!(deposit_data_vec.pubkey.to_string(), "a096f540bcd7c0b798bd37f2bf06a6c2be9bb7e7572c8de83099ec2e423b1aa081aae701932eba3cf577b8a9f284870d");
+        assert_eq!(deposit_data_vec.pubkey.to_string(), "0xa096f540bcd7c0b798bd37f2bf06a6c2be9bb7e7572c8de83099ec2e423b1aa081aae701932eba3cf577b8a9f284870d");
     }
 
     #[test]
@@ -449,8 +479,8 @@ mod tests {
             Err(e) => {
                 debug!("Error: {:?}", e);
                 assert_eq!(e.to_string(), "validation failed: 'No deposit data found'");
-            },
-            _ => panic!("Parsed invalid data")
+            }
+            _ => panic!("Parsed invalid data"),
         }
     }
 
@@ -468,9 +498,12 @@ mod tests {
         match resp.validate_and_verify_data() {
             Err(e) => {
                 debug!("Error: {:?}", e);
-                assert_eq!(e.to_string(), "validation failed: 'Multiple deposit data found'");
-            },
-            _ => panic!("Parsed invalid data")
+                assert_eq!(
+                    e.to_string(),
+                    "validation failed: 'Multiple deposit data found'"
+                );
+            }
+            _ => panic!("Parsed invalid data"),
         }
     }
 }

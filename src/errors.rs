@@ -14,7 +14,7 @@ pub enum ValidatorError {
     /// Serde JSON Error.
     #[error(transparent)]
     SerdeJsonError(#[from] serde_json::Error),
-    
+
     /// Error when the ECDSA signature verification fails.
     #[error("ECDSA verification failed: '{0}'")]
     ECDSAVerficationError(String),
