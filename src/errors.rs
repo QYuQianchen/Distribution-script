@@ -7,13 +7,25 @@ pub enum ValidatorError {
     #[error(transparent)]
     IOError(#[from] std::io::Error),
 
-    /// Error when the signature verification fails.
-    #[error("Signature verification failed")]
-    SignatureVerificationFailed,
+    /// Error when the validator data file verification fails.
+    #[error("validation failed: '{0}'")]
+    ValidationError(String),
 
     /// Serde JSON Error.
     #[error(transparent)]
     SerdeJsonError(#[from] serde_json::Error),
+    
+    /// Error when the ECDSA signature verification fails.
+    #[error("ECDSA verification failed: '{0}'")]
+    ECDSAVerficationError(String),
+
+    /// Error when the BLS signature verification fails.
+    #[error("BLS verification failed: '{0}'")]
+    BLSVerificationError(String),
+
+    /// Error when the other verification fails.
+    #[error("Other verification failed: '{0}'")]
+    OtherVerificationError(String),
 }
 
 /// Error type for subgraph.
