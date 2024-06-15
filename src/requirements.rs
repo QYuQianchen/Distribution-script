@@ -239,15 +239,15 @@ mod tests {
 
     fn write_csv(file: &std::fs::File) {
         let mut writer = csv::Writer::from_writer(file);
-        writer.write_record(&["owner", "safe"]).unwrap();
+        writer.write_record(["owner", "safe"]).unwrap();
         writer
-            .write_record(&[
+            .write_record([
                 "0x226d833075c26dbf9aa377de0363e435808953a4",
                 "0x0d9d6d05a37353a98a9beaaf2c852089793f5dd1",
             ])
             .unwrap();
         writer
-            .write_record(&[
+            .write_record([
                 "0x226d833075c26dbf9aa377de0363e435808953a4",
                 "0x0bb7ac4a34a92d1b417b94dd8866e5b90e544c80",
             ])

@@ -259,7 +259,7 @@ pub mod tests {
 
         let subgraph_query = SubgraphQuery::new(
             34310645,
-            &vec![address!("226d833075c26dbf9aa377de0363e435808953a4")],
+            &[address!("226d833075c26dbf9aa377de0363e435808953a4")],
         );
 
         // let data = subgraph_query.run().await?.data.expect("cannot query data");
