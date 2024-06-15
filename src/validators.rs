@@ -245,7 +245,7 @@ impl SignedDepositData {
     /// Validate and verify the deposit data. Firstly verify the ECDSA and BLS signatures, then validate the deposit data.
     /// The deposit data must exactly have one element. 
     /// Return the deposit data string if the validation is successful.
-    pub fn validate_and_verify_data(&self) -> Result<&str, Box<dyn std::error::Error>> {
+    pub fn validate_and_verify_data(&self) -> Result<DepositData, Box<dyn std::error::Error>> {
         let deposit_data_vec: Vec<DepositData> = self.verify()?;
 
         // deposit data vector must not be empty
@@ -256,7 +256,7 @@ impl SignedDepositData {
         if deposit_data_vec.len() > 1 {
             return Err(Box::new(ValidatorError::ValidationError("Multiple deposit data found".to_string())));
         }
-        Ok(&self.msg)
+        Ok(deposit_data_vec[0].clone())
     }
 }
 
@@ -264,7 +264,6 @@ impl SignedDepositData {
 mod tests {
     use super::*;
     use log::debug;
-    // use serde::de;
     use std::io::Write;
     use tempfile::tempdir;
 
@@ -432,7 +431,7 @@ mod tests {
         let resp: SignedDepositData = serde_json::from_str(s).unwrap();
         let deposit_data_vec = resp.validate_and_verify_data().unwrap();
 
-        assert_eq!(deposit_data_vec, resp.msg);
+        assert_eq!(deposit_data_vec.pubkey.to_string(), "a096f540bcd7c0b798bd37f2bf06a6c2be9bb7e7572c8de83099ec2e423b1aa081aae701932eba3cf577b8a9f284870d");
     }
 
     #[test]
